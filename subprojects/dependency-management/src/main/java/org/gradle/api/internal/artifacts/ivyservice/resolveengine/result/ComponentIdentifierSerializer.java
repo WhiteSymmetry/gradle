@@ -21,6 +21,7 @@ import org.gradle.api.artifacts.component.LibraryBinaryIdentifier;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
 import org.gradle.internal.component.external.model.DefaultModuleComponentIdentifier;
+import org.gradle.internal.component.local.model.DefaultCompositeProjectComponentIdentifier;
 import org.gradle.internal.component.local.model.DefaultLibraryBinaryIdentifier;
 import org.gradle.internal.component.local.model.DefaultProjectComponentIdentifier;
 import org.gradle.internal.serialize.Decoder;
@@ -35,6 +36,8 @@ public class ComponentIdentifierSerializer implements Serializer<ComponentIdenti
 
         if(Implementation.BUILD.getId() == id) {
             return new DefaultProjectComponentIdentifier(decoder.readString());
+        } else if(Implementation.COMPOSITE.getId() == id) {
+            return new DefaultCompositeProjectComponentIdentifier(decoder.readString());
         } else if(Implementation.MODULE.getId() == id) {
             return new DefaultModuleComponentIdentifier(decoder.readString(), decoder.readString(), decoder.readString());
         } else if (Implementation.LIBRARY.getId() == id) {
@@ -59,6 +62,10 @@ public class ComponentIdentifierSerializer implements Serializer<ComponentIdenti
             ProjectComponentIdentifier projectComponentIdentifier = (ProjectComponentIdentifier)value;
             encoder.writeByte(Implementation.BUILD.getId());
             encoder.writeString(projectComponentIdentifier.getProjectPath());
+        } else if(value instanceof DefaultCompositeProjectComponentIdentifier) {
+            DefaultCompositeProjectComponentIdentifier projectComponentIdentifier = (DefaultCompositeProjectComponentIdentifier)value;
+            encoder.writeByte(Implementation.COMPOSITE.getId());
+            encoder.writeString(projectComponentIdentifier.getProjectPath());
         } else if(value instanceof DefaultLibraryBinaryIdentifier) {
             LibraryBinaryIdentifier libraryIdentifier = (LibraryBinaryIdentifier)value;
             encoder.writeByte(Implementation.LIBRARY.getId());
@@ -71,7 +78,7 @@ public class ComponentIdentifierSerializer implements Serializer<ComponentIdenti
     }
 
     private static enum Implementation {
-        MODULE((byte) 1), BUILD((byte) 2), LIBRARY((byte) 3);
+        MODULE((byte) 1), BUILD((byte) 2), LIBRARY((byte) 3), COMPOSITE((byte) 4);
 
         private final byte id;
 

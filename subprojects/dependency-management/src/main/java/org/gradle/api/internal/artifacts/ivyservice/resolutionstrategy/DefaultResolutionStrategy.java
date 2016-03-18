@@ -111,7 +111,7 @@ public class DefaultResolutionStrategy implements ResolutionStrategyInternal {
     }
 
     public boolean resolveGraphToDetermineTaskDependencies() {
-        return assumeFluidDependencies || dependencySubstitutions.hasDependencySubstitutionRules();
+        return true;
     }
 
 

@@ -31,10 +31,7 @@ import org.gradle.api.internal.artifacts.ivyservice.modulecache.ModuleArtifactsC
 import org.gradle.api.internal.artifacts.ivyservice.modulecache.ModuleMetaDataCache;
 import org.gradle.api.internal.artifacts.ivyservice.moduleconverter.ConfigurationComponentMetaDataBuilder;
 import org.gradle.api.internal.artifacts.ivyservice.moduleconverter.dependencies.DependencyDescriptorFactory;
-import org.gradle.api.internal.artifacts.ivyservice.projectmodule.DefaultProjectComponentRegistry;
-import org.gradle.api.internal.artifacts.ivyservice.projectmodule.DefaultProjectPublicationRegistry;
-import org.gradle.api.internal.artifacts.ivyservice.projectmodule.ProjectDependencyResolver;
-import org.gradle.api.internal.artifacts.ivyservice.projectmodule.ProjectPublicationRegistry;
+import org.gradle.api.internal.artifacts.ivyservice.projectmodule.*;
 import org.gradle.api.internal.artifacts.ivyservice.resolveengine.DefaultArtifactDependencyResolver;
 import org.gradle.api.internal.artifacts.ivyservice.resolveengine.store.ResolutionResultsStoreFactory;
 import org.gradle.api.internal.artifacts.mvnsettings.*;
@@ -63,6 +60,7 @@ import org.gradle.internal.resource.local.ivy.LocallyAvailableResourceFinderFact
 import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.logging.ProgressLoggerFactory;
 import org.gradle.util.BuildCommencedTimeProvider;
+import org.gradle.util.CollectionUtils;
 import org.gradle.util.GradleVersion;
 
 /**
@@ -257,6 +255,33 @@ class DependencyManagementBuildScopeServices {
         @Override
         public boolean canCreate(ResolveContext context) {
             return true;
+        }
+
+        @Override
+        public ComponentResolvers create(ResolveContext context) {
+            return DelegatingComponentResolvers.of(resolver);
+        }
+    }
+
+    ResolverProviderFactory createCompositeResolverProviderFactory(ServiceRegistry serviceRegistry) {
+        return new CompositeProjectResolverProviderFactory(serviceRegistry);
+    }
+
+    private static class CompositeProjectResolverProviderFactory implements ResolverProviderFactory {
+        private final CompositeProjectDependencyResolver resolver;
+
+        public CompositeProjectResolverProviderFactory(ServiceRegistry registry) {
+            CompositeProjectComponentRegistry controller = CollectionUtils.findSingle(registry.getAll(CompositeProjectComponentRegistry.class));
+            if (controller == null) {
+                resolver = null;
+            } else {
+                resolver = new CompositeProjectDependencyResolver(controller);
+            }
+        }
+
+        @Override
+        public boolean canCreate(ResolveContext context) {
+            return resolver != null;
         }
 
         @Override
