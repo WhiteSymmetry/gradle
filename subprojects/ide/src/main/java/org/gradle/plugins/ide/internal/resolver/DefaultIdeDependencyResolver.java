@@ -19,6 +19,7 @@ package org.gradle.plugins.ide.internal.resolver;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.*;
 import org.gradle.api.artifacts.component.ComponentSelector;
+import org.gradle.api.artifacts.component.CompositeProjectComponentIdentifier;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
 import org.gradle.api.artifacts.result.DependencyResult;
@@ -64,6 +65,17 @@ public class DefaultIdeDependencyResolver implements IdeDependencyResolver {
             }
         }
 
+        final Set<ResolvedComponentResult> compositeProjectComponents = CollectionUtils.filter(result.getAllComponents(), new Spec<ResolvedComponentResult>() {
+            @Override
+            public boolean isSatisfiedBy(ResolvedComponentResult element) {
+                return element.getId() instanceof CompositeProjectComponentIdentifier;
+            }
+        });
+
+        for (ResolvedComponentResult projectComponent : compositeProjectComponents) {
+            CompositeProjectComponentIdentifier id = (CompositeProjectComponentIdentifier) projectComponent.getId();
+            ideProjectDependencies.add(new IdeProjectDependency(configuration.getName(), id.getProjectPath()));
+        }
         return ideProjectDependencies;
     }
 
