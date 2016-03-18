@@ -19,6 +19,9 @@ package org.gradle.tooling.internal.provider.runner;
 import com.google.common.collect.Lists;
 import org.gradle.StartParameter;
 import org.gradle.api.BuildCancelledException;
+import org.gradle.api.internal.artifacts.ivyservice.projectmodule.CompositeBuildContext;
+import org.gradle.api.internal.artifacts.ivyservice.projectmodule.CompositeContextBuilder;
+import org.gradle.api.internal.artifacts.ivyservice.projectmodule.CompositeScopeServices;
 import org.gradle.api.logging.LogLevel;
 import org.gradle.configuration.GradleLauncherMetaData;
 import org.gradle.initialization.*;
@@ -27,7 +30,9 @@ import org.gradle.internal.classpath.ClassPath;
 import org.gradle.internal.composite.*;
 import org.gradle.internal.invocation.BuildAction;
 import org.gradle.internal.invocation.BuildActionRunner;
+import org.gradle.internal.service.DefaultServiceRegistry;
 import org.gradle.internal.service.ServiceRegistry;
+import org.gradle.internal.service.ServiceRegistryBuilder;
 import org.gradle.internal.service.scopes.BuildSessionScopeServices;
 import org.gradle.launcher.daemon.configuration.DaemonUsage;
 import org.gradle.launcher.exec.BuildActionParameters;
@@ -51,27 +56,30 @@ public class CompositeBuildModelActionRunner implements CompositeBuildActionRunn
         BuildModelAction buildModelAction = (BuildModelAction) action;
         List<Object> results = null;
         if (isModelRequest(buildModelAction)) {
-            results = fetchCompositeModelsInProcess(buildModelAction, requestContext, actionParameters.getCompositeParameters().getBuilds(), buildController.getBuildScopeServices());
+            results = fetchCompositeModelsInProcess(buildModelAction, requestContext, actionParameters.getCompositeParameters(), buildController.getBuildScopeServices());
         } else {
             if (!buildModelAction.isRunTasks()) {
                 throw new IllegalStateException("No tasks defined.");
             }
-            executeTasksInProcess(action.getStartParameter(), actionParameters, requestContext, buildController.getBuildScopeServices());
+            executeTasksInProcess(action.getStartParameter(), actionParameters.getCompositeParameters(), requestContext, buildController.getBuildScopeServices());
         }
         PayloadSerializer payloadSerializer = buildController.getBuildScopeServices().get(PayloadSerializer.class);
         buildController.setResult(new BuildActionResult(payloadSerializer.serialize(results), null));
     }
 
-    private void executeTasksInProcess(StartParameter parentStartParam, CompositeBuildActionParameters actionParameters, BuildRequestContext buildRequestContext, ServiceRegistry sharedServices) {
-        CompositeParameters compositeParameters = actionParameters.getCompositeParameters();
+    private void executeTasksInProcess(StartParameter parentStartParam, CompositeParameters compositeParameters, BuildRequestContext buildRequestContext, ServiceRegistry sharedServices) {
         GradleLauncherFactory launcherFactory = sharedServices.get(GradleLauncherFactory.class);
 
+        List<GradleParticipantBuild> builds = compositeParameters.getBuilds();
         GradleParticipantBuild participant = compositeParameters.getTargetBuild();
+
+        DefaultServiceRegistry compositeServices = createCompositeAwareServices(sharedServices, parentStartParam, launcherFactory, builds);
+
         StartParameter startParameter = parentStartParam.newInstance();
         startParameter.setProjectDir(participant.getProjectDir());
         startParameter.setSearchUpwards(false);
 
-        ServiceRegistry buildScopedServices = new BuildSessionScopeServices(sharedServices, startParameter, ClassPath.EMPTY);
+        ServiceRegistry buildScopedServices = new BuildSessionScopeServices(compositeServices, startParameter, ClassPath.EMPTY);
 
         DefaultBuildRequestContext requestContext = new DefaultBuildRequestContext(new DefaultBuildRequestMetaData(new GradleLauncherMetaData(), System.currentTimeMillis()), buildRequestContext.getCancellationToken(), buildRequestContext.getEventConsumer(), buildRequestContext.getOutputListener(), buildRequestContext.getErrorListener());
         GradleLauncher launcher = launcherFactory.newInstance(startParameter, requestContext, buildScopedServices);
@@ -89,9 +97,12 @@ public class CompositeBuildModelActionRunner implements CompositeBuildActionRunn
     }
 
     private List<Object> fetchCompositeModelsInProcess(BuildModelAction modelAction, BuildRequestContext buildRequestContext,
-                                                                     List<GradleParticipantBuild> participantBuilds,
-                                                                     ServiceRegistry sharedServices) {
+                                                       CompositeParameters compositeParameters,
+                                                       ServiceRegistry sharedServices) {
+        List<GradleParticipantBuild> participantBuilds = compositeParameters.getBuilds();
+
         GradleLauncherFactory gradleLauncherFactory = sharedServices.get(GradleLauncherFactory.class);
+        DefaultServiceRegistry compositeServices = createCompositeAwareServices(sharedServices, modelAction.getStartParameter(), gradleLauncherFactory, participantBuilds);
 
         BuildActionRunner runner = new SubscribableBuildActionRunner(new BuildModelsActionRunner());
         org.gradle.launcher.exec.BuildActionExecuter<BuildActionParameters> buildActionExecuter = new InProcessBuildActionExecuter(gradleLauncherFactory, runner);
@@ -107,7 +118,7 @@ public class CompositeBuildModelActionRunner implements CompositeBuildActionRunn
             StartParameter startParameter = modelAction.getStartParameter().newInstance();
             startParameter.setProjectDir(participant.getProjectDir());
 
-            ServiceRegistry buildScopedServices = new BuildSessionScopeServices(sharedServices, startParameter, ClassPath.EMPTY);
+            ServiceRegistry buildScopedServices = new BuildSessionScopeServices(compositeServices, startParameter, ClassPath.EMPTY);
 
             BuildModelAction participantAction = new BuildModelAction(startParameter, modelAction.getModelName(), false, modelAction.getClientSubscriptions());
             try {
@@ -142,5 +153,26 @@ public class CompositeBuildModelActionRunner implements CompositeBuildActionRunn
 
     private Object compositeModelResult(GradleParticipantBuild participant, String projectPath, Object modelValue) {
         return new Object[]{participant.getProjectDir(), projectPath, modelValue};
+    }
+
+    private DefaultServiceRegistry createCompositeAwareServices(ServiceRegistry sharedServices, StartParameter parentStartParam, GradleLauncherFactory gradleLauncherFactory, List<GradleParticipantBuild> builds) {
+        CompositeBuildContext context = constructCompositeContext(gradleLauncherFactory, builds);
+
+        DefaultServiceRegistry compositeServices = (DefaultServiceRegistry) ServiceRegistryBuilder.builder()
+            .displayName("Composite services")
+            .parent(sharedServices)
+            .build();
+        compositeServices.add(CompositeBuildContext.class, context);
+        compositeServices.addProvider(new CompositeScopeServices(parentStartParam, compositeServices));
+        return compositeServices;
+    }
+
+    private CompositeBuildContext constructCompositeContext(GradleLauncherFactory gradleLauncherFactory, List<GradleParticipantBuild> participantBuilds) {
+        CompositeContextBuilder builder = new CompositeContextBuilder(gradleLauncherFactory);
+        for (GradleParticipantBuild participant : participantBuilds) {
+            final String participantName = participant.getProjectDir().getName();
+            builder.addParticipant(participantName, participant.getProjectDir());
+        }
+        return builder.build();
     }
 }
