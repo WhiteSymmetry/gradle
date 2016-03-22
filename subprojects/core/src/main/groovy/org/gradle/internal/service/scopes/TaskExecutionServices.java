@@ -24,6 +24,8 @@ import org.gradle.api.internal.changedetection.changes.DefaultTaskArtifactStateR
 import org.gradle.api.internal.changedetection.changes.ShortCircuitTaskArtifactStateRepository;
 import org.gradle.api.internal.changedetection.state.*;
 import org.gradle.api.internal.changedetection.taskcache.LocalDirectoryTaskResultCache;
+import org.gradle.api.internal.changedetection.taskcache.TaskResultCache;
+import org.gradle.api.internal.changedetection.taskcache.TaskResultPacker;
 import org.gradle.api.internal.changedetection.taskcache.ZipTaskResultPacker;
 import org.gradle.api.internal.file.FileCollectionFactory;
 import org.gradle.api.internal.file.FileResolver;
@@ -51,7 +53,7 @@ import java.io.File;
 
 public class TaskExecutionServices {
 
-    TaskExecuter createTaskExecuter(TaskArtifactStateRepository repository, ListenerManager listenerManager, Gradle gradle, CachingTreeVisitor treeVisitor) {
+    TaskExecuter createTaskExecuter(TaskArtifactStateRepository repository, ListenerManager listenerManager, Gradle gradle, CachingTreeVisitor treeVisitor, TaskResultCache taskResultCache, TaskResultPacker taskResultPacker) {
         // TODO - need a more comprehensible way to only collect inputs for the outer build
         //      - we are trying to ignore buildSrc here, but also avoid weirdness with use of GradleBuild tasks
         boolean isOuterBuild = gradle.getParent() == null;
@@ -69,8 +71,8 @@ public class TaskExecutionServices {
                                 repository,
                                 treeVisitor,
                                 new SkipCachedTaskExecuter(
-                                    new LocalDirectoryTaskResultCache(new File("/tmp/test-cache")),
-                                    new ZipTaskResultPacker(),
+                                    taskResultCache,
+                                    taskResultPacker,
                                     new PostExecutionAnalysisTaskExecuter(
                                         new ExecuteActionsTaskExecuter(
                                             listenerManager.getBroadcaster(TaskActionListener.class)
@@ -141,5 +143,14 @@ public class TaskExecutionServices {
 
     BuildOperationProcessor createBuildOperationProcessor(StartParameter startParameter, ExecutorFactory executorFactory) {
         return new DefaultBuildOperationProcessor(new DefaultBuildOperationQueueFactory(), executorFactory, startParameter.getMaxWorkerCount());
+    }
+
+    TaskResultCache createTaskResultCache(StartParameter startParameter, Gradle gradle) {
+        File cacheDir = new File(startParameter.getGradleUserHomeDir(), "dist-cache-dir-test");
+        return new LocalDirectoryTaskResultCache(cacheDir);
+    }
+
+    TaskResultPacker createTaskResultPacker() {
+        return new ZipTaskResultPacker();
     }
 }
