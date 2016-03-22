@@ -23,6 +23,8 @@ import org.gradle.api.internal.changedetection.TaskArtifactStateRepository;
 import org.gradle.api.internal.changedetection.changes.DefaultTaskArtifactStateRepository;
 import org.gradle.api.internal.changedetection.changes.ShortCircuitTaskArtifactStateRepository;
 import org.gradle.api.internal.changedetection.state.*;
+import org.gradle.api.internal.changedetection.taskcache.LocalDirectoryTaskResultCache;
+import org.gradle.api.internal.changedetection.taskcache.ZipTaskResultPacker;
 import org.gradle.api.internal.file.FileCollectionFactory;
 import org.gradle.api.internal.file.FileResolver;
 import org.gradle.api.internal.hash.DefaultHasher;
@@ -45,6 +47,8 @@ import org.gradle.internal.reflect.Instantiator;
 import org.gradle.internal.serialize.DefaultSerializerRegistry;
 import org.gradle.internal.serialize.SerializerRegistry;
 
+import java.io.File;
+
 public class TaskExecutionServices {
 
     TaskExecuter createTaskExecuter(TaskArtifactStateRepository repository, ListenerManager listenerManager, Gradle gradle, CachingTreeVisitor treeVisitor) {
@@ -64,9 +68,13 @@ public class TaskExecutionServices {
                             new SkipUpToDateTaskExecuter(
                                 repository,
                                 treeVisitor,
-                                new PostExecutionAnalysisTaskExecuter(
-                                    new ExecuteActionsTaskExecuter(
-                                        listenerManager.getBroadcaster(TaskActionListener.class)
+                                new SkipCachedTaskExecuter(
+                                    new LocalDirectoryTaskResultCache(new File("/tmp/test-cache")),
+                                    new ZipTaskResultPacker(),
+                                    new PostExecutionAnalysisTaskExecuter(
+                                        new ExecuteActionsTaskExecuter(
+                                            listenerManager.getBroadcaster(TaskActionListener.class)
+                                        )
                                     )
                                 )
                             )

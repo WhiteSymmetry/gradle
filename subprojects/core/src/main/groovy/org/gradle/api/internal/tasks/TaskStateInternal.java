@@ -79,7 +79,14 @@ public class TaskStateInternal implements TaskState {
      * Marks this task as up-to-date.
      */
     public void upToDate() {
-        skipped("UP-TO-DATE");
+        upToDate("UP-TO-DATE");
+    }
+
+    /**
+     * Marks this task as up-to-date.
+     */
+    public void upToDate(String skipMessage) {
+        skipped(skipMessage);
         upToDate = true;
     }
 
