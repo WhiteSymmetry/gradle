@@ -110,6 +110,7 @@ public class ZipTaskResultPacker implements TaskResultPacker {
                 if (file.exists()) {
                     FileUtils.forceDelete(file);
                 }
+                FileUtils.forceMkdir(file.getParentFile());
                 Files.asByteSink(file).writeFrom(zipInput);
             }
         } catch (Exception e) {
@@ -138,8 +139,8 @@ public class ZipTaskResultPacker implements TaskResultPacker {
                 return false;
             }
             RelativeFile that = (RelativeFile) o;
-            return com.google.common.base.Objects.equal(file, that.file) &&
-                Objects.equal(path, that.path);
+            return Objects.equal(file, that.file)
+                && Objects.equal(path, that.path);
         }
 
         @Override

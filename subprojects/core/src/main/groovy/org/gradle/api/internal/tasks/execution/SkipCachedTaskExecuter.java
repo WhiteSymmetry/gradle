@@ -63,7 +63,7 @@ public class SkipCachedTaskExecuter implements TaskExecuter {
                 return;
             }
         } catch (IOException e) {
-            LOGGER.info("Could not lode cached results for {}", task, e);
+            LOGGER.info("Could not lode cached results for " + task, e);
         }
 
         executer.execute(task, state, context);
@@ -72,7 +72,7 @@ public class SkipCachedTaskExecuter implements TaskExecuter {
                 TaskResultOutput cachedResult = taskResultPacker.pack(cacheRootDir, task.getOutputs().getFiles());
                 taskResultCache.put(cacheKey, cachedResult);
             } catch (IOException e) {
-                LOGGER.info("Could not cache results for {}", task, e);
+                LOGGER.info("Could not cache results for " + task, e);
             }
         }
     }
