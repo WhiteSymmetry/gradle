@@ -158,8 +158,14 @@ public class TaskExecutionServices {
         return new DefaultBuildOperationProcessor(new DefaultBuildOperationQueueFactory(), executorFactory, startParameter.getMaxWorkerCount());
     }
 
-    TaskResultCache createTaskResultCache(StartParameter startParameter, Gradle gradle) {
-        File cacheDir = new File(startParameter.getGradleUserHomeDir(), "dist-cache-dir-test");
+    TaskResultCache createTaskResultCache(StartParameter startParameter) {
+        String cacheDirPath = startParameter.getSystemPropertiesArgs().get("org.gradle.cache.tasks.directory");
+        File cacheDir;
+        if (cacheDirPath != null) {
+            cacheDir = new File(cacheDirPath);
+        } else {
+            cacheDir = new File(startParameter.getGradleUserHomeDir(), "task-cache");
+        }
         return new LocalDirectoryTaskResultCache(cacheDir);
     }
 
