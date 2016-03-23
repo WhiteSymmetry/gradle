@@ -88,7 +88,7 @@ public class TaskExecutionServices {
     }
 
     private TaskExecuter cacheExecuterIfNecessary(StartParameter startParameter, TaskResultCache taskResultCache, TaskResultPacker taskResultPacker, TaskInputHasher taskInputHasher, TaskExecuter delegate) {
-        if ("true".equals(startParameter.getSystemPropertiesArgs().get("org.gradle.cache.distributed"))) {
+        if ("true".equals(startParameter.getSystemPropertiesArgs().get("org.gradle.cache.tasks"))) {
             return new SkipCachedTaskExecuter(
                 taskResultCache,
                 taskResultPacker,
