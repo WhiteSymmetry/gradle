@@ -84,6 +84,8 @@ public abstract class AbstractTask implements TaskInternal, DynamicObjectAware {
 
     private AndSpec<Task> onlyIfSpec = new AndSpec<Task>(createNewOnlyIfSpec());
 
+    private AndSpec<Task> cacheIfSpec = new AndSpec<Task>(createNewOnlyIfSpec());
+
     private TaskExecuter executer;
 
     private final ServiceRegistry services;
@@ -252,6 +254,55 @@ public abstract class AbstractTask implements TaskInternal, DynamicObjectAware {
 
     public Spec<? super TaskInternal> getOnlyIf() {
         return onlyIfSpec;
+    }
+
+    @Override
+    public void cacheIf(final Closure closure) {
+        taskMutator.mutate("Task.cacheIf(Closure)", new Runnable() {
+            public void run() {
+                cacheIfSpec = cacheIfSpec.and(closure);
+            }
+        });
+    }
+
+    @Override
+    public void cacheIf(final Spec<? super Task> spec) {
+        taskMutator.mutate("Task.cacheIf(Spec)", new Runnable() {
+            public void run() {
+                cacheIfSpec = cacheIfSpec.and(spec);
+            }
+        });
+    }
+
+    @Override
+    public void setCacheIf(final Spec<? super Task> spec) {
+        taskMutator.mutate("Task.setCacheIf(Spec)", new Runnable() {
+            public void run() {
+                cacheIfSpec = createNewCacheIfSpec().and(spec);
+            }
+        });
+    }
+
+    @Override
+    public void setCacheIf(final Closure closure) {
+        taskMutator.mutate("Task.setCacheIf(Closure)", new Runnable() {
+            public void run() {
+                cacheIfSpec = createNewCacheIfSpec().and(closure);
+            }
+        });
+    }
+
+    private AndSpec<Task> createNewCacheIfSpec() {
+        return new AndSpec<Task>(new Spec<Task>() {
+            public boolean isSatisfiedBy(Task element) {
+                return element == AbstractTask.this && enabled;
+            }
+        });
+    }
+
+    @Override
+    public Spec<? super TaskInternal> getCacheIf() {
+        return cacheIfSpec;
     }
 
     public boolean getDidWork() {

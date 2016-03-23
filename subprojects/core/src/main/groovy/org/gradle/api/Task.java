@@ -300,6 +300,48 @@ public interface Task extends Comparable<Task>, ExtensionAware {
     void setOnlyIf(Spec<? super Task> onlyIfSpec);
 
     /**
+     * <p>Cache the results of the task only if the given closure returns true.  The closure will be evaluated at task execution
+     * time, not during configuration.  The closure will be passed a single parameter, this task. If the closure returns
+     * false, the results of the task will not be cached.</p>
+     *
+     * <p>You may add multiple such predicates. The results of the task are not cached if any of the predicates return false.</p>
+     *
+     * @param closure code to execute to determine if the results of the task should be cached.
+     */
+    void cacheIf(Closure closure);
+
+    /**
+     * <p>Cache the results of the task only if the given spec is satisfied. The spec will be evaluated at task execution time, not
+     * during configuration. If the Spec is not satisfied, the results of the task will not be cached.</p>
+     *
+     * <p>You may add multiple such predicates. The results of the task are not cached if any of the predicates return false.</p>
+     *
+     * @param spec specifies if the results of the task should be cached.
+     */
+    void cacheIf(Spec<? super Task> spec);
+
+    /**
+     * <p>Cache the results of the task only if the given closure returns true.  The closure will be evaluated at task execution
+     * time, not during configuration.  The closure will be passed a single parameter, this task. If the closure returns
+     * false, the results of the task will be not be cached.</p>
+     *
+     * <p>The given predicate replaces all such predicates for this task.</p>
+     *
+     * @param closure code to execute to determine if the results of the task should be cached.
+     */
+    void setCacheIf(Closure closure);
+
+    /**
+     * <p>Cache the results of the task only if the given spec is satisfied. The spec will be evaluated at task execution time, not
+     * during configuration. If the Spec is not satisfied, the results of the task will not be cached.</p>
+     *
+     * <p>The given predicate replaces all such predicates for this task.</p>
+     *
+     * @param spec specifies if the results of the task should be cached.
+     */
+    void setCacheIf(Spec<? super Task> spec);
+
+    /**
      * Returns the execution state of this task. This provides information about the execution of this task, such as
      * whether it has executed, been skipped, has failed, etc.
      *

@@ -38,6 +38,8 @@ public interface TaskInternal extends Task, Configurable<Task> {
 
     Spec<? super TaskInternal> getOnlyIf();
 
+    Spec<? super TaskInternal> getCacheIf();
+
     void execute();
 
     StandardOutputCapture getStandardOutputCapture();

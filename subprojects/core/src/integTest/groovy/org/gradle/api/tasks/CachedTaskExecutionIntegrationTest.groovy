@@ -21,7 +21,7 @@ import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 class CachedTaskExecutionIntegrationTest extends AbstractIntegrationSpec {
     def cacheDir = testDirectoryProvider.createDir("task-cache")
 
-    def "tasks get cached"() {
+    def setup() {
         buildFile << """
             apply plugin: "java"
         """
@@ -36,7 +36,9 @@ class CachedTaskExecutionIntegrationTest extends AbstractIntegrationSpec {
         file("src/main/resources/resource.properties") << """
             test=true
         """
+    }
 
+    def "tasks get cached"() {
         expect:
         succeedsWithCache "assemble"
         skippedTasks.empty
@@ -45,6 +47,29 @@ class CachedTaskExecutionIntegrationTest extends AbstractIntegrationSpec {
 
         succeedsWithCache "assemble"
         nonSkippedTasks.empty
+    }
+
+    def "clean doesn't get cached"() {
+        expect:
+        succeedsWithCache "assemble"
+        succeedsWithCache "clean"
+        succeedsWithCache "assemble"
+        succeedsWithCache "clean"
+        nonSkippedTasks.contains ":clean"
+    }
+
+    def "task with cacheIf off doesn't get cached"() {
+        buildFile << """
+            compileJava.cacheIf { false }
+        """
+
+        expect:
+        succeedsWithCache "assemble"
+        succeedsWithCache "clean"
+        succeedsWithCache "assemble"
+        // :compileJava is not cached, but :jar is still cached as its inputs haven't changed
+        nonSkippedTasks.contains ":compileJava"
+        skippedTasks.contains ":jar"
     }
 
     def succeedsWithCache(String... tasks) {

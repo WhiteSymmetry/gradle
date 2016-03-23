@@ -25,6 +25,7 @@ import org.gradle.api.internal.changedetection.taskcache.*
 import org.gradle.api.internal.tasks.TaskExecuter
 import org.gradle.api.internal.tasks.TaskExecutionContext
 import org.gradle.api.internal.tasks.TaskStateInternal
+import org.gradle.api.specs.Specs
 import spock.lang.Specification
 
 public class SkipCachedTaskExecuterTest extends Specification {
@@ -32,6 +33,8 @@ public class SkipCachedTaskExecuterTest extends Specification {
     def task = Mock(TaskInternal)
     def project = Mock(Project)
     def projectDir = Mock(File)
+    def outputs = Mock(TaskOutputsInternal)
+    def outputFiles = Mock(FileCollection)
     def taskState = Mock(TaskStateInternal)
     def taskContext = Mock(TaskExecutionContext)
     def taskResultCache = Mock(TaskResultCache)
@@ -48,6 +51,11 @@ public class SkipCachedTaskExecuterTest extends Specification {
         executer.execute(task, taskState, taskContext)
 
         then:
+        1 * task.getOutputs() >> outputs
+        1 * outputs.getFiles() >> outputFiles
+        1 * outputFiles.isEmpty() >> false
+        1 * task.getCacheIf() >> Specs.SATISFIES_ALL
+
         1 * taskInputHasher.createHash(task, projectDir) >> cacheKey
         1 * taskResultCache.get(cacheKey) >> cachedResult
         1 * taskResultPacker.unpack(projectDir, cachedResult)
@@ -59,13 +67,16 @@ public class SkipCachedTaskExecuterTest extends Specification {
 
     def "executes task when no cached result is available"() {
         def cachedResult = Mock(TaskResultOutput)
-        def outputs = Mock(TaskOutputsInternal)
-        def outputFiles = Mock(FileCollection)
 
         when:
         executer.execute(task, taskState, taskContext)
 
         then:
+        1 * task.getOutputs() >> outputs
+        1 * outputs.getFiles() >> outputFiles
+        1 * outputFiles.isEmpty() >> false
+        1 * task.getCacheIf() >> Specs.SATISFIES_ALL
+
         1 * taskInputHasher.createHash(task, projectDir) >> cacheKey
         1 * taskResultCache.get(cacheKey) >> null
         1 * task.getProject() >> project
@@ -83,11 +94,16 @@ public class SkipCachedTaskExecuterTest extends Specification {
         0 * _
     }
 
-    def "does not cache when task fails"() {
+    def "does not cache results when executed task fails"() {
         when:
         executer.execute(task, taskState, taskContext)
 
         then:
+        1 * task.getOutputs() >> outputs
+        1 * outputs.getFiles() >> outputFiles
+        1 * outputFiles.isEmpty() >> false
+        1 * task.getCacheIf() >> Specs.SATISFIES_ALL
+
         1 * taskInputHasher.createHash(task, projectDir) >> cacheKey
         1 * taskResultCache.get(cacheKey) >> null
         1 * task.getProject() >> project
@@ -96,6 +112,35 @@ public class SkipCachedTaskExecuterTest extends Specification {
         then:
         1 * delegate.execute(task, taskState, taskContext)
         _ * taskState.getFailure() >> new RuntimeException()
+        0 * _
+    }
+
+    def "executes task when task doesn't declare any outputs"() {
+        when:
+        executer.execute(task, taskState, taskContext)
+
+        then:
+        1 * task.getOutputs() >> outputs
+        1 * outputs.getFiles() >> outputFiles
+        1 * outputFiles.isEmpty() >> true
+
+        then:
+        1 * delegate.execute(task, taskState, taskContext)
+        0 * _
+    }
+
+    def "executes task and does not cache results when cacheIf is false"() {
+        when:
+        executer.execute(task, taskState, taskContext)
+
+        then:
+        1 * task.getOutputs() >> outputs
+        1 * outputs.getFiles() >> outputFiles
+        1 * outputFiles.isEmpty() >> false
+        1 * task.getCacheIf() >> Specs.SATISFIES_NONE
+
+        then:
+        1 * delegate.execute(task, taskState, taskContext)
         0 * _
     }
 }
