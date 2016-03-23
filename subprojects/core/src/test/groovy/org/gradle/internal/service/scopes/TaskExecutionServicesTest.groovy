@@ -18,6 +18,9 @@ package org.gradle.internal.service.scopes
 import org.gradle.StartParameter
 import org.gradle.api.internal.cache.StringInterner
 import org.gradle.api.internal.changedetection.state.InMemoryTaskArtifactCache
+import org.gradle.api.internal.changedetection.taskcache.TaskInputHasher
+import org.gradle.api.internal.changedetection.taskcache.TaskResultCache
+import org.gradle.api.internal.changedetection.taskcache.TaskResultPacker
 import org.gradle.api.internal.file.FileCollectionFactory
 import org.gradle.api.internal.file.FileResolver
 import org.gradle.api.internal.tasks.TaskExecuter
@@ -38,17 +41,18 @@ import org.gradle.internal.service.ServiceRegistry
 import spock.lang.Specification
 
 class TaskExecutionServicesTest extends Specification {
-    final ServiceRegistry parent = Mock()
-    final Gradle gradle = Mock()
+    final def parent = Mock(ServiceRegistry)
+    final def gradle = Mock(Gradle)
+    final def startParameter = Mock(StartParameter)
     final def services = new DefaultServiceRegistry(parent).addProvider(new TaskExecutionServices())
 
     def "makes a TaskExecutor available"() {
         given:
-        CacheRepository cacheRepository = Mock()
-        CacheBuilder cacheBuilder = Mock()
+        def cacheRepository = Mock(CacheRepository)
+        def cacheBuilder = Mock(CacheBuilder)
         _ * parent.get(Gradle) >> gradle
         _ * parent.get(ListenerManager) >> Mock(ListenerManager)
-        _ * parent.get(StartParameter) >> Mock(StartParameter)
+        _ * parent.get(StartParameter) >> startParameter
         _ * parent.get(GradleBuildEnvironment) >> Stub(GradleBuildEnvironment)
         _ * parent.get(CacheRepository) >> cacheRepository
         _ * parent.get(Instantiator) >> Mock(Instantiator)
@@ -58,6 +62,10 @@ class TaskExecutionServicesTest extends Specification {
         _ * parent.get(FileSystem) >> Mock(FileSystem)
         _ * parent.get(FileCollectionFactory) >> Mock(FileCollectionFactory)
         _ * parent.get(StringInterner) >> new StringInterner()
+        _ * parent.get(TaskResultCache) >> Mock(TaskResultCache)
+        _ * parent.get(TaskResultPacker) >> Mock(TaskResultPacker)
+        _ * parent.get(TaskInputHasher) >> Mock(TaskInputHasher)
+        _ * startParameter.getSystemPropertiesArgs() >> Collections.emptyMap()
         _ * cacheRepository.cache(gradle, 'taskArtifacts') >> cacheBuilder
         _ * cacheBuilder.withDisplayName(!null) >> cacheBuilder
         _ * cacheBuilder.withLockOptions(!null) >> cacheBuilder
@@ -70,7 +78,7 @@ class TaskExecutionServicesTest extends Specification {
 
     def "makes a BuildOperationProcessor available"() {
         given:
-        _ * parent.get(StartParameter) >> Mock(StartParameter)
+        _ * parent.get(StartParameter) >> startParameter
         _ * parent.get(ExecutorFactory) >> Mock(ExecutorFactory)
 
         expect:
