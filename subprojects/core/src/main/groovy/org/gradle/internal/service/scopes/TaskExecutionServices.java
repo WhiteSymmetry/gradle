@@ -53,7 +53,8 @@ import java.io.File;
 
 public class TaskExecutionServices {
 
-    TaskExecuter createTaskExecuter(TaskArtifactStateRepository repository, ListenerManager listenerManager, Gradle gradle, CachingTreeVisitor treeVisitor, TaskResultCache taskResultCache, TaskResultPacker taskResultPacker) {
+    TaskExecuter createTaskExecuter(TaskArtifactStateRepository repository, ListenerManager listenerManager, Gradle gradle, CachingTreeVisitor treeVisitor,
+                                    TaskResultCache taskResultCache, TaskResultPacker taskResultPacker, StartParameter startParameter) {
         // TODO - need a more comprehensible way to only collect inputs for the outer build
         //      - we are trying to ignore buildSrc here, but also avoid weirdness with use of GradleBuild tasks
         boolean isOuterBuild = gradle.getParent() == null;
@@ -70,7 +71,8 @@ public class TaskExecutionServices {
                             new SkipUpToDateTaskExecuter(
                                 repository,
                                 treeVisitor,
-                                new SkipCachedTaskExecuter(
+                                cacheExecuterIfNecessary(
+                                    startParameter,
                                     taskResultCache,
                                     taskResultPacker,
                                     new PostExecutionAnalysisTaskExecuter(
@@ -85,6 +87,18 @@ public class TaskExecutionServices {
                 )
             )
         );
+    }
+
+    private TaskExecuter cacheExecuterIfNecessary(StartParameter startParameter, TaskResultCache taskResultCache, TaskResultPacker taskResultPacker, PostExecutionAnalysisTaskExecuter executer) {
+        if (startParameter.getSystemPropertiesArgs().containsKey("org.gradle.cache.distributed")) {
+            return new SkipCachedTaskExecuter(
+                taskResultCache,
+                taskResultPacker,
+                executer
+            );
+        } else {
+            return executer;
+        }
     }
 
     TaskArtifactStateCacheAccess createCacheAccess(Gradle gradle, CacheRepository cacheRepository, InMemoryTaskArtifactCache inMemoryTaskArtifactCache, GradleBuildEnvironment environment) {
