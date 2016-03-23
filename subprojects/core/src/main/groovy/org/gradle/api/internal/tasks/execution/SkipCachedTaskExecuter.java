@@ -40,6 +40,7 @@ public class SkipCachedTaskExecuter implements TaskExecuter {
         this.taskResultCache = taskResultCache;
         this.taskResultPacker = taskResultPacker;
         this.executer = executer;
+        LOGGER.info("Using {}", taskResultCache.getDescription());
     }
 
     @Override

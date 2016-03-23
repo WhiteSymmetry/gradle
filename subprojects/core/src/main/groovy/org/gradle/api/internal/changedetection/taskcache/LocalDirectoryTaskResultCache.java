@@ -68,4 +68,9 @@ public class LocalDirectoryTaskResultCache implements TaskResultCache {
     private File getFile(HashCode key) {
         return new File(directory, key.toString());
     }
+
+    @Override
+    public String getDescription() {
+        return "local directory cache in " + directory;
+    }
 }

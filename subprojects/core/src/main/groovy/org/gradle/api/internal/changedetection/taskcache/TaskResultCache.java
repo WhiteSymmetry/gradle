@@ -24,4 +24,6 @@ public interface TaskResultCache {
     TaskResultInput get(HashCode key) throws IOException;
 
     void put(HashCode key, TaskResultOutput result) throws IOException;
+
+    String getDescription();
 }
