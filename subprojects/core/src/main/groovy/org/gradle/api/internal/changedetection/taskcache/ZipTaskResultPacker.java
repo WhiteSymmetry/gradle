@@ -16,6 +16,8 @@
 
 package org.gradle.api.internal.changedetection.taskcache;
 
+import com.google.common.base.Objects;
+import com.google.common.collect.Lists;
 import com.google.common.io.ByteSink;
 import com.google.common.io.Closer;
 import com.google.common.io.Files;
@@ -26,13 +28,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 public class ZipTaskResultPacker implements TaskResultPacker {
     @Override
-    public TaskResultOutput pack(final File rootDir, final FileCollection files) throws IOException {
+    public TaskResultOutput pack(final File rootDir, final FileCollection fileCollection) throws IOException {
         return new TaskResultOutput() {
             @Override
             public void writeTo(ByteSink output) throws IOException {
@@ -41,16 +44,26 @@ public class ZipTaskResultPacker implements TaskResultPacker {
                 try {
                     ZipOutputStream zipOutput = new ZipOutputStream(outputStream);
                     String rootPath = rootDir.getAbsolutePath();
-                    for (File file : files.getFiles()) {
-                        String absolutePath = file.getAbsolutePath();
-                        if (!absolutePath.startsWith(rootPath)) {
-                            throw new IOException(String.format("File %s is outside cache root dir %s", file, rootDir));
-                        }
-                        String path = absolutePath.substring(rootPath.length() + 1);
-                        zipOutput.putNextEntry(new ZipEntry(path));
 
+                    Queue<RelativeFile> queue = new ArrayDeque<RelativeFile>();
+                    queue(queue, rootPath, fileCollection.getFiles());
+
+                    while (!queue.isEmpty()) {
+                        RelativeFile relativeFile = queue.remove();
+                        String path = relativeFile.path;
+                        File file = relativeFile.file;
+
+                        if (file.isDirectory()) {
+                            zipOutput.putNextEntry(new ZipEntry(path + "/"));
+                            File[] children = file.listFiles();
+                            if (children != null) {
+                                queue(queue, rootPath, Arrays.asList(children));
+                            }
+                            continue;
+                        }
+
+                        zipOutput.putNextEntry(new ZipEntry(path));
                         Files.copy(file, zipOutput);
-                        zipOutput.closeEntry();
                     }
                     zipOutput.close();
                 } catch (Exception e) {
@@ -61,6 +74,21 @@ public class ZipTaskResultPacker implements TaskResultPacker {
                 }
             }
         };
+    }
+
+    private static void queue(Queue<RelativeFile> queue, String rootPath, Collection<File> files) throws IOException {
+        List<RelativeFile> relativeFiles = Lists.newArrayListWithCapacity(files.size());
+        for (File file : files) {
+            // TODO Make this more robust or use something from an existing library
+            String absolutePath = file.getAbsolutePath();
+            if (!absolutePath.startsWith(rootPath)) {
+                throw new IOException(String.format("File %s is outside cache root dir %s", file, rootPath));
+            }
+            String path = absolutePath.substring(rootPath.length() + 1);
+            relativeFiles.add(new RelativeFile(file, path));
+        }
+        Collections.sort(relativeFiles);
+        queue.addAll(relativeFiles);
     }
 
     @Override
@@ -79,7 +107,6 @@ public class ZipTaskResultPacker implements TaskResultPacker {
                     FileUtils.forceMkdir(file);
                     continue;
                 }
-                FileUtils.forceMkdir(file.getParentFile());
                 if (file.exists()) {
                     FileUtils.forceDelete(file);
                 }
@@ -90,6 +117,40 @@ public class ZipTaskResultPacker implements TaskResultPacker {
         } finally {
             //noinspection ThrowFromFinallyBlock
             closer.close();
+        }
+    }
+
+    private static class RelativeFile implements Comparable<RelativeFile> {
+        private final File file;
+        private final String path;
+
+        public RelativeFile(File file, String path) {
+            this.file = file;
+            this.path = path;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            RelativeFile that = (RelativeFile) o;
+            return com.google.common.base.Objects.equal(file, that.file) &&
+                Objects.equal(path, that.path);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(file, path);
+        }
+
+        @Override
+        @SuppressWarnings("NullableProblems")
+        public int compareTo(RelativeFile other) {
+            return path.compareTo(other.path);
         }
     }
 }
