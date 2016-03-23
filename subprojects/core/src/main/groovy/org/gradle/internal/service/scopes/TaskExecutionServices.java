@@ -23,10 +23,7 @@ import org.gradle.api.internal.changedetection.TaskArtifactStateRepository;
 import org.gradle.api.internal.changedetection.changes.DefaultTaskArtifactStateRepository;
 import org.gradle.api.internal.changedetection.changes.ShortCircuitTaskArtifactStateRepository;
 import org.gradle.api.internal.changedetection.state.*;
-import org.gradle.api.internal.changedetection.taskcache.LocalDirectoryTaskResultCache;
-import org.gradle.api.internal.changedetection.taskcache.TaskResultCache;
-import org.gradle.api.internal.changedetection.taskcache.TaskResultPacker;
-import org.gradle.api.internal.changedetection.taskcache.ZipTaskResultPacker;
+import org.gradle.api.internal.changedetection.taskcache.*;
 import org.gradle.api.internal.file.FileCollectionFactory;
 import org.gradle.api.internal.file.FileResolver;
 import org.gradle.api.internal.hash.DefaultHasher;
@@ -54,7 +51,7 @@ import java.io.File;
 public class TaskExecutionServices {
 
     TaskExecuter createTaskExecuter(TaskArtifactStateRepository repository, ListenerManager listenerManager, Gradle gradle, CachingTreeVisitor treeVisitor,
-                                    TaskResultCache taskResultCache, TaskResultPacker taskResultPacker, StartParameter startParameter) {
+                                    TaskResultCache taskResultCache, TaskResultPacker taskResultPacker, TaskInputHasher taskInputHasher, StartParameter startParameter) {
         // TODO - need a more comprehensible way to only collect inputs for the outer build
         //      - we are trying to ignore buildSrc here, but also avoid weirdness with use of GradleBuild tasks
         boolean isOuterBuild = gradle.getParent() == null;
@@ -75,6 +72,7 @@ public class TaskExecutionServices {
                                     startParameter,
                                     taskResultCache,
                                     taskResultPacker,
+                                    taskInputHasher,
                                     new PostExecutionAnalysisTaskExecuter(
                                         new ExecuteActionsTaskExecuter(
                                             listenerManager.getBroadcaster(TaskActionListener.class)
@@ -89,15 +87,16 @@ public class TaskExecutionServices {
         );
     }
 
-    private TaskExecuter cacheExecuterIfNecessary(StartParameter startParameter, TaskResultCache taskResultCache, TaskResultPacker taskResultPacker, PostExecutionAnalysisTaskExecuter executer) {
-        if (startParameter.getSystemPropertiesArgs().containsKey("org.gradle.cache.distributed")) {
+    private TaskExecuter cacheExecuterIfNecessary(StartParameter startParameter, TaskResultCache taskResultCache, TaskResultPacker taskResultPacker, TaskInputHasher taskInputHasher, TaskExecuter delegate) {
+        if ("true".equals(startParameter.getSystemPropertiesArgs().get("org.gradle.cache.distributed"))) {
             return new SkipCachedTaskExecuter(
                 taskResultCache,
                 taskResultPacker,
-                executer
+                taskInputHasher,
+                delegate
             );
         } else {
-            return executer;
+            return delegate;
         }
     }
 
@@ -166,5 +165,9 @@ public class TaskExecutionServices {
 
     TaskResultPacker createTaskResultPacker() {
         return new ZipTaskResultPacker();
+    }
+
+    TaskInputHasher createTaskInputHasher(Gradle gradle) {
+        return new DefaultTaskInputHasher(gradle.getGradleVersion());
     }
 }

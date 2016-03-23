@@ -34,11 +34,13 @@ public class SkipCachedTaskExecuter implements TaskExecuter {
 
     private final TaskResultCache taskResultCache;
     private final TaskResultPacker taskResultPacker;
+    private final TaskInputHasher taskInputHasher;
     private final TaskExecuter executer;
 
-    public SkipCachedTaskExecuter(TaskResultCache taskResultCache, TaskResultPacker taskResultPacker, TaskExecuter executer) {
+    public SkipCachedTaskExecuter(TaskResultCache taskResultCache, TaskResultPacker taskResultPacker, TaskInputHasher taskInputHasher, TaskExecuter executer) {
         this.taskResultCache = taskResultCache;
         this.taskResultPacker = taskResultPacker;
+        this.taskInputHasher = taskInputHasher;
         this.executer = executer;
         LOGGER.info("Using {}", taskResultCache.getDescription());
     }
@@ -49,12 +51,7 @@ public class SkipCachedTaskExecuter implements TaskExecuter {
         Clock clock = new Clock();
 
         File cacheRootDir = task.getProject().getProjectDir();
-
-        CacheKeyBuilder cacheKeyBuilder = CacheKeyBuilder.builder(cacheRootDir);
-        cacheKeyBuilder.put(task.getInputs().getProperties());
-        cacheKeyBuilder.put(task.getInputs().getFiles());
-        cacheKeyBuilder.withoutFileContents().put(task.getOutputs().getFiles());
-        HashCode cacheKey = cacheKeyBuilder.build();
+        HashCode cacheKey = taskInputHasher.createHash(task, cacheRootDir);
         LOGGER.debug("Cache key for {} is {}", task, cacheKey);
 
         try {
