@@ -152,7 +152,7 @@ public class CacheKeyBuilder {
         if (rootPath != null) {
             String absolutePath = file.getAbsolutePath();
             if (!absolutePath.startsWith(rootPath + "/")) {
-                throw new IllegalArgumentException("File " + file + " is not under root path " + rootPath);
+                throw new CacheKeyException("File " + file + " is not under root path " + rootPath);
             }
             path = absolutePath.substring(rootPath.length() + 1);
         } else {

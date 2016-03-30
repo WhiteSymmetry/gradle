@@ -31,14 +31,18 @@ public class DefaultTaskInputHasher implements TaskInputHasher {
 
     @Override
     public HashCode createHash(TaskInternal task, File cacheRootDir) {
-        CacheKeyBuilder cacheKeyBuilder = CacheKeyBuilder.builder(cacheRootDir);
+        try {
+            CacheKeyBuilder cacheKeyBuilder = CacheKeyBuilder.builder(cacheRootDir);
 
-        // Make sure if cache format changes we don't have collisions
-        cacheKeyBuilder.put(cacheVersion);
+            // Make sure if cache format changes we don't have collisions
+            cacheKeyBuilder.put(cacheVersion);
 
-        cacheKeyBuilder.put(task.getInputs().getProperties());
-        cacheKeyBuilder.put(task.getInputs().getFiles());
-        cacheKeyBuilder.withoutFileContents().put(task.getOutputs().getFiles());
-        return cacheKeyBuilder.build();
+            cacheKeyBuilder.put(task.getInputs().getProperties());
+            cacheKeyBuilder.put(task.getInputs().getFiles());
+            cacheKeyBuilder.withoutFileContents().put(task.getOutputs().getFiles());
+            return cacheKeyBuilder.build();
+        } catch (CacheKeyException e) {
+            throw new CacheKeyException("Could not generate cache key for task " + task, e);
+        }
     }
 }
