@@ -18,6 +18,7 @@ package org.gradle.api.internal.changedetection.taskcache;
 
 import com.google.common.hash.HashCode;
 import org.gradle.api.internal.TaskInternal;
+import org.gradle.api.tasks.TaskInputs;
 
 import java.io.File;
 
@@ -31,18 +32,15 @@ public class DefaultTaskInputHasher implements TaskInputHasher {
 
     @Override
     public HashCode createHash(TaskInternal task, File cacheRootDir) {
-        try {
-            CacheKeyBuilder cacheKeyBuilder = CacheKeyBuilder.builder(cacheRootDir);
+        CacheKeyBuilder cacheKeyBuilder = CacheKeyBuilder.builder(cacheRootDir);
 
-            // Make sure if cache format changes we don't have collisions
-            cacheKeyBuilder.put(cacheVersion);
+        // Make sure if cache format changes we don't have collisions
+        cacheKeyBuilder.put(cacheVersion);
 
-            cacheKeyBuilder.put(task.getInputs().getProperties());
-            cacheKeyBuilder.put(task.getInputs().getFiles());
-            cacheKeyBuilder.withoutFileContents().put(task.getOutputs().getFiles());
-            return cacheKeyBuilder.build();
-        } catch (CacheKeyException e) {
-            throw new CacheKeyException("Could not generate cache key for task " + task, e);
-        }
+        TaskInputs inputs = task.getInputs();
+        cacheKeyBuilder.put(inputs.getProperties());
+        cacheKeyBuilder.put(inputs.getFiles());
+        cacheKeyBuilder.withoutFileContents().put(task.getOutputs().getFiles());
+        return cacheKeyBuilder.build();
     }
 }

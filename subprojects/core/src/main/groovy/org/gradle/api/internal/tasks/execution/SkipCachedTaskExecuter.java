@@ -48,6 +48,8 @@ public class SkipCachedTaskExecuter implements TaskExecuter {
 
     @Override
     public void execute(TaskInternal task, TaskStateInternal state, TaskExecutionContext context) {
+        Clock clock = new Clock();
+
         // Do not try to cache tasks that produce no output
         boolean hasOutputs = !task.getOutputs().getFiles().isEmpty();
 
@@ -60,38 +62,42 @@ public class SkipCachedTaskExecuter implements TaskExecuter {
             return;
         }
 
-        if (!shouldCache) {
+        LOGGER.debug("Determining if {} is cached already", task);
+
+        File cacheRootDir = task.getProject().getProjectDir();
+        HashCode cacheKey = null;
+        if (shouldCache) {
+            try {
+                cacheKey = taskInputHasher.createHash(task, cacheRootDir);
+                LOGGER.debug("Cache key for {} is {}", task, cacheKey);
+            } catch (CacheKeyException e) {
+                LOGGER.info(String.format("Could not build cache key for task %s", task), e);
+            }
+        } else {
             if (!hasOutputs) {
                 LOGGER.debug("Not caching {} as task declares no outputs", task);
             } else {
                 LOGGER.debug("Not caching {} as task cacheIf is false.", task);
             }
-            executeDelegate(task, state, context);
-            return;
         }
 
-        LOGGER.debug("Determining if {} is cached already", task);
-        Clock clock = new Clock();
-
-        File cacheRootDir = task.getProject().getProjectDir();
-        HashCode cacheKey = taskInputHasher.createHash(task, cacheRootDir);
-        LOGGER.debug("Cache key for {} is {}", task, cacheKey);
-
-        try {
-            TaskResultInput cachedResult = taskResultCache.get(cacheKey);
-            if (cachedResult != null) {
-                taskResultPacker.unpack(cacheRootDir, cachedResult);
-                LOGGER.info("Unpacked result for {} from cache (took {}).", task, clock.getTime());
-                state.upToDate("CACHED");
-                return;
+        if (cacheKey != null) {
+            try {
+                TaskResultInput cachedResult = taskResultCache.get(cacheKey);
+                if (cachedResult != null) {
+                    taskResultPacker.unpack(cacheRootDir, cachedResult);
+                    LOGGER.info("Unpacked result for {} from cache (took {}).", task, clock.getTime());
+                    state.upToDate("CACHED");
+                    return;
+                }
+            } catch (IOException e) {
+                LOGGER.info("Could not load cached results for " + task + " with cache key " + cacheKey, e);
             }
-        } catch (IOException e) {
-            LOGGER.info("Could not load cached results for " + task + " with cache key " + cacheKey, e);
         }
 
         executeDelegate(task, state, context);
 
-        if (state.getFailure() == null) {
+        if (cacheKey != null && state.getFailure() == null) {
             try {
                 TaskResultOutput cachedResult = taskResultPacker.pack(cacheRootDir, task.getOutputs().getFiles());
                 taskResultCache.put(cacheKey, cachedResult);
